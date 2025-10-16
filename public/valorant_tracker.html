@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Valorant Stats Tracker</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for Valorant theme */
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #101822; 
+            color: #ece8e1; 
+        }
+        .valorant-red { color: #ff4655; }
+        .valorant-card { 
+            background-color: rgba(30, 41, 59, 0.5); 
+            border: 1px solid #334155; 
+            border-radius: 0.75rem; 
+            backdrop-filter: blur(10px); 
+            -webkit-backdrop-filter: blur(10px); 
+        }
+        .rank-glow { 
+            box-shadow: 0 0 15px rgba(255, 70, 85, 0.5), 0 0 5px rgba(255, 70, 85, 0.8); 
+        }
+        .form-input, .form-button { 
+            border: 2px solid #334155; 
+            transition: all 0.3s ease; 
+        }
+        .form-input:focus { 
+            border-color: #ff4655; 
+            box-shadow: 0 0 10px rgba(255, 70, 85, 0.5); 
+            outline: none; 
+        }
+        .form-button:hover { 
+            background-color: #ff4655; 
+            border-color: #ff4655; 
+            color: #101822; 
+        }
+    </style>
+</head>
+<body class="min-h-screen antialiased">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <!-- Header Section -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight">Valorant <span class="valorant-red">Stats Tracker</span></h1>
+            <p class="text-slate-400 mt-2">Entrez un Riot ID pour trouver les statistiques d'un joueur.</p>
+        </header>
+
+        <!-- Search Form -->
+        <form id="search-form" class="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto mb-8">
+            <input type="text" id="riot-id-input" placeholder="NomDuJoueur#TAG" class="form-input w-full px-4 py-3 bg-slate-800 rounded-lg text-white placeholder-slate-500 focus:ring-0" required>
+            <button type="submit" class="form-button flex-shrink-0 bg-slate-800 text-white font-bold py-3 px-6 rounded-lg">Rechercher</button>
+        </form>
+
+        <!-- Results Container -->
+        <main id="results-container" class="space-y-8">
+            <!-- Initial state message -->
+            <div id="initial-message" class="text-center text-slate-500 py-16">
+                <p>Les statistiques du joueur s'afficheront ici.</p>
+            </div>
+
+            <!-- Loading spinner -->
+            <div id="loader" class="hidden text-center py-16">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-valorant-red"></div>
+                <p class="mt-4 text-slate-400">Recherche en cours...</p>
+            </div>
+
+            <!-- Error message container -->
+            <div id="error-message" class="hidden valorant-card p-6 text-center">
+                <h3 class="text-xl font-bold valorant-red">Erreur</h3>
+                <p id="error-text" class="text-slate-300 mt-2"></p>
+            </div>
+
+            <!-- Stats content (hidden by default) -->
+            <div id="stats-content" class="hidden animate-fade-in space-y-8">
+                <!-- Player Card Section -->
+                <section id="player-card" class="valorant-card p-6 rounded-xl relative overflow-hidden">
+                    <div class="absolute inset-0 bg-cover bg-center opacity-10" id="player-card-bg"></div>
+                    <div class="relative flex flex-col md:flex-row items-center gap-6">
+                        <img id="player-avatar" src="" alt="Avatar du joueur" class="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-slate-700">
+                        <div class="text-center md:text-left">
+                            <h2 id="player-name" class="text-3xl md:text-4xl font-bold"></h2>
+                            <p id="player-level" class="text-slate-400 text-lg"></p>
+                        </div>
+                        <!-- Rank info is hidden by default as API endpoint doesn't provide it easily -->
+                        <div class="md:ml-auto text-center hidden">
+                            <img id="player-rank-icon" src="" alt="Icône de rang" class="w-24 h-24 md:w-32 md:h-32 mx-auto rank-glow">
+                            <p id="player-rank" class="text-xl font-bold mt-2"></p>
+                            <p id="player-rr" class="valorant-red font-semibold"></p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Key Stats Section -->
+                <section id="key-stats">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+                </section>
+
+                <!-- Top Agents Section -->
+                <section id="top-agents">
+                    <h3 class="text-2xl font-bold mb-4">Agents les plus joués</h3>
+                    <div id="agent-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                </section>
+
+                <!-- Match History Section -->
+                <section id="match-history">
+                    <h3 class="text-2xl font-bold mb-4">Historique des matchs</h3>
+                    <div class="valorant-card p-2 md:p-4">
+                        <div id="match-list" class="space-y-2"></div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+<script>
+    // --- DOM Elements ---
+    const searchForm = document.getElementById('search-form');
+    const riotIdInput = document.getElementById('riot-id-input');
+    const initialMessage = document.getElementById('initial-message');
+    const loader = document.getElementById('loader');
+    const errorMessage = document.getElementById('error-message');
+    const errorText = document.getElementById('error-text');
+    const statsContent = document.getElementById('stats-content');
+
+    // --- UI Functions ---
+    function showLoading() {
+        initialMessage.classList.add('hidden');
+        errorMessage.classList.add('hidden');
+        statsContent.classList.add('hidden');
+        loader.classList.remove('hidden');
+    }
+
+    function showError(message) {
+        loader.classList.add('hidden');
+        errorText.textContent = message;
+        errorMessage.classList.remove('hidden');
+    }
+
+    // --- API Call Function ---
+    function fetchPlayerData(riotId) {
+        const [name, tag] = riotId.split('#');
+        // IMPORTANT: Relative URL works locally and on Render
+        const apiUrl = `/api/stats/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`;
+        
+        return new Promise(async (resolve, reject) => {
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || `Error ${response.status}`);
+                }
+                resolve(await response.json());
+            } catch (error) {
+                console.error("Error in fetchPlayerData:", error);
+                reject(error.message);
+            }
+        });
+    }
+
+    // --- Render Function ---
+    function renderPlayerData(data) {
+        // Player card
+        document.getElementById('player-card-bg').style.backgroundImage = `url(${data.player.cardUrl})`;
+        document.getElementById('player-avatar').src = data.player.avatarUrl;
+        document.getElementById('player-name').textContent = `${data.player.name} #${data.player.tag}`;
+        document.getElementById('player-level').textContent = `Niveau ${data.player.level} (simulé)`;
+
+        // Clear and hide sections that need more complex API data
+        document.querySelector('#key-stats .grid').innerHTML = '<p class="col-span-full text-center text-slate-400">Statistiques clés non disponibles via cet endpoint.</p>';
+        document.getElementById('agent-list').innerHTML = '<p class="text-center text-slate-400">Données d\'agents non disponibles via cet endpoint.</p>';
+
+        // Match history
+        const matchListContainer = document.getElementById('match-list');
+        matchListContainer.innerHTML = '';
+        if (data.matchHistory && data.matchHistory.length > 0) {
+            data.matchHistory.forEach(match => {
+                const matchRow = `
+                    <div class="p-3 rounded-lg hover:bg-slate-800/50">
+                        <p>ID Match: ${match.matchId}</p>
+                        <p class="text-sm text-slate-400">Début: ${new Date(match.gameStartTimeMillis).toLocaleString('fr-FR')}</p>
+                    </div>`;
+                matchListContainer.innerHTML += matchRow;
+            });
+        } else {
+            matchListContainer.innerHTML = '<p class="p-4 text-center text-slate-400">Aucun historique de match trouvé.</p>';
+        }
+
+        // Show content
+        loader.classList.add('hidden');
+        statsContent.classList.remove('hidden');
+    }
+
+    // --- Event Handler ---
+    async function handleSearch(e) {
+        e.preventDefault();
+        const riotId = riotIdInput.value.trim();
+        if (!riotId || !riotId.includes('#')) {
+            showError('Veuillez entrer un Riot ID valide au format "Nom#TAG".');
+            return;
+        }
+        showLoading();
+        try {
+            const data = await fetchPlayerData(riotId);
+            renderPlayerData(data);
+        } catch (error) {
+            showError(error);
+        }
+    }
+
+    // --- Event Listener ---
+    searchForm.addEventListener('submit', handleSearch);
+</script>
+
+</body>
+</html>

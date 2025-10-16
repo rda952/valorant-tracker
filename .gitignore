@@ -1,0 +1,17 @@
+Fichier pour ignorer les fichiers et dossiers non désirés dans Git
+
+Dépendances du projet
+
+Le dossier node_modules est énorme et peut être recréé à tout moment
+
+avec la commande 'npm install'. Il ne doit jamais être sur GitHub.
+
+node_modules/
+
+Fichiers d'environnement
+
+NE JAMAIS METTRE CE FICHIER SUR GITHUB. Il contient vos clés API secrètes.
+
+L'hébergeur (Render) a une section spéciale pour ajouter ces variables.
+
+.env
